@@ -12,6 +12,7 @@ This is the Bayesian analysis of Jinyu's data. We fit it with brms for legibilit
 library(lme4)
 library(tidyverse)
 library(readxl)
+library(haven)
 df_valence <- read_excel("data/nested_Exp1_valence_imme_ratings_diff.xlsx")
 
 # Standardising valence 
@@ -73,16 +74,16 @@ summary(aov(zv ~ valence * intervention, data = df_valence))
 
 ```{r}
 # The last model without issues
-model_randslop <- lmer(zv ~ valence * intervention  + (1 + valence|id) + (1|intervention:image), data=df_valence, REML = T)
+model_rand_slope <- lmer(zv ~ valence * intervention  + (1 + valence|id) + (1|intervention:image), data = df_valence, REML = T)
 
 # Still good
-summary(lmer(zv ~ valence * intervention  + (1|id/valence:intervention), data=df_valence, REML = T))
+model3 <- lmer(zv ~ valence * intervention  + (1|id/valence:intervention), data=df_valence, REML = T)
 
 # It works!
-summary(lmer(zv ~ valence * intervention + (1|int_vl:image), data=df_valence, REML = T))
+model4 <- lmer(zv ~ valence * intervention + (1|int_vl:image), data=df_valence, REML = T)
 
 # Still works; including id
-summary(lmer(zv ~ valence * intervention + (1|id) + (1|int_vl:image), data=df_valence, REML = T))
+model5 <- lmer(zv ~ valence * intervention + (1|id) + (1|int_vl:image), data=df_valence, REML = T)
 
 ```
 
