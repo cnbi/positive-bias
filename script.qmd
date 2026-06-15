@@ -1,0 +1,147 @@
+---
+title: "Nested Bayes Analysis"
+author: "b.a.e"
+format: html
+editor: visual
+---
+
+This is the Bayesian analysis of Jinyu's data. We fit it with brms for legibility, the idea is to model the interaction between valences and stimuli with random slopes and intercepts for individuals. The variables of interest are "Intervention", "Pic_valence", "Subject" and "Valence_post" as the outcome. "Valence_post" needs to be standardised. First we subset the data to a neat dataframe for analysis.
+
+```{r}
+# Loading data
+library(lme4)
+library(tidyverse)
+library(readxl)
+df_valence <- read_excel("data/nested_Exp1_valence_imme_ratings_diff.xlsx")
+
+# Standardising valence 
+zv <- c(scale(df_valence$Valence_post,center = T,scale = T))
+# Extracting within person observations
+id <- df_valence$Subject
+# Extracting valence factor
+valence <- df_valence$Pic_Valence
+# Extracting intervention factor
+intervention <- df_valence$Intervention
+# Extracting image
+image <- df_valence$Image
+#Making interaction 
+int_vl <- interaction(df_valence$Intervention, df_valence$Pic_Valence)
+
+df <- data.frame(id = factor(id), 
+                 image = factor(image),
+                 valence = factor(valence), 
+                 intervention = factor(intervention), 
+                 int_vl,
+                 zv)
+```
+
+# Frequentist analyses
+
+```{r}
+summary(lmer(zv ~ valence + (1|id) , data=df_valence, REML=T))
+summary(lmer(zv ~ valence + intervention + (1|id) , data=df_valence, REML=T))
+
+# Base model
+base_model <- lmer(zv ~ valence * intervention  + (1|id), data=df_valence, REML=T)
+
+# Suggested by other papers
+suggested_model <- lmer(zv ~ valence * intervention + (1|id) + (1|image), data=df_valence, REML=T)
+
+# Nested design
+nested_model <- lmer(zv ~ valence * intervention + (1|id) + (1|image:intervention), data=df_valence, REML=T)
+
+# Start the issues
+summary(lmer(zv ~ valence * intervention  + (1|id) + (1|valence:intervention), data=df_valence, REML = T))
+
+# Tested models 
+summary(lmer(zv ~ valence * intervention + (1|id) + (1|valence:intervention), data= df_valence, REML = T))
+
+summary(lmer(zv ~ valence * intervention + (1|id/valence:intervention) , data=df_valence, REML=T))
+
+summary(lmer(zv ~ valence * intervention + (1|valence:intervention) + (1 + valence/intervention), data=df_valence, REML=T))
+
+summary(lmer(zv ~ valence * intervention + (image|id/valence:intervention), data=df_valence, REML=T))
+
+summary(lmer(zv ~ valence * intervention + (1+ valence*intervention|id) + (1/valence:intervention:image), data=df_valence, REML=T))
+
+summary(lmer(zv ~ valence * intervention + (1+ valence:intervention|id) + (1/valence:intervention:image), data=df_valence, REML=T))
+
+summary(lmer(zv ~ valence * intervention + (1+valence+intervention|id), data=df_valence, REML=T))
+
+summary(aov(zv ~ valence * intervention, data = df_valence))
+```
+
+```{r}
+# The last model without issues
+model_randslop <- lmer(zv ~ valence * intervention  + (1 + valence|id) + (1|intervention:image), data=df_valence, REML = T)
+
+# Still good
+summary(lmer(zv ~ valence * intervention  + (1|id/valence:intervention), data=df_valence, REML = T))
+
+# It works!
+summary(lmer(zv ~ valence * intervention + (1|int_vl:image), data=df_valence, REML = T))
+
+# Still works; including id
+summary(lmer(zv ~ valence * intervention + (1|id) + (1|int_vl:image), data=df_valence, REML = T))
+
+```
+
+No random slope for this model, it is too complex and it renders warnings and errors.
+
+$R^2$ Marginal: Only fixed effects.
+
+# Bayesian analyses
+
+The target model is a mixed effects regression with random slopes and intercepts for each individual, specifically targeting the interaction between valences and intervention. Since the data is massive, we try out the terget model on a smaller subset. We specify the formula:
+
+```{r}
+df_sub <- df[1:500,]
+
+library(brms)
+formula <- (
+    zv ~ valence * intervention
+    + (1 + valence:intervention | id)  # participant random intercept
+    + (1 | valence/intervention)       # stimuli nested in valence
+)
+```
+
+We can then specify the priors, going for weakly informative ones initially.
+
+```{r}
+priors <- prior(
+  # Fixed effects — outcome is standardised.
+  prior(normal(0, 1),   class = b), # Slope for id
+  prior(normal(0, 1),   class = Intercept), # Intercept for id
+
+  # SDs for participant random effects (intercept + interaction slope)
+  prior(exponential(1),  class = sd, group = participant),
+
+  # SDs for intervention in valence (negative/control)
+  prior(exponential(1),  class = sd, group = valence),
+  prior(exponential(1),  class = sd, group = valence:intervention),
+
+  # Correlation between participant intercept and interaction slope
+  prior(lkj(2), class = cor,  group = participant),
+
+  # Residual SD
+  prior(exponential(1),  class = sigma)
+)
+```
+
+We fit the model
+
+```{r}
+fit <- brm(
+  formula = formula,
+  data    = df,
+  family  = gaussian(),
+  chains  = 4,
+  iter    = 4000, 
+  control = list(adapt_delta = 0.95),
+  seed    = 42 # Answer to the meaning of life, the universe, and everything.
+)
+
+summary(fit)
+plot(fit)
+pairs(fit)
+```
