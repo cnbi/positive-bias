@@ -49,10 +49,10 @@ base_model <- lmer(zv ~ valence * intervention  + (1|id), data=df_valence, REML=
 suggested_model <- lmer(zv ~ valence * intervention + (1|id) + (1|image), data=df_valence, REML=T)
 
 # Nested design
-nested_model <- lmer(zv ~ valence * intervention + (1|id) + (1|image:intervention), data=df_valence, REML=T)
+nested_model <- lmer(zv ~ valence * intervention + (1|id) + (1|image:intervention), data=df_valence, REML=T) # Model 5 for Alfons
 
 # Start the issues
-summary(lmer(zv ~ valence * intervention  + (1|id) + (1|valence:intervention), data=df_valence, REML = T))
+summary(lmer(zv ~ valence * intervention  + (1|id) + (1|valence:intervention), data=df_valence, REML = T)) # Model 6 for Alfons 
 
 # Tested models 
 summary(lmer(zv ~ valence * intervention + (1|id) + (1|valence:intervention), data= df_valence, REML = T))
@@ -83,13 +83,31 @@ model3 <- lmer(zv ~ valence * intervention  + (1|id/valence:intervention), data=
 model4 <- lmer(zv ~ valence * intervention + (1|int_vl:image), data=df_valence, REML = T)
 
 # Still works; including id
-model5 <- lmer(zv ~ valence * intervention + (1|id) + (1|int_vl:image), data=df_valence, REML = T)
+model5 <- lmer(zv ~ valence * intervention + (1|id) + (1|int_vl:image), data=df_valence, REML = T) # Same as model3
 
 ```
 
 No random slope for this model, it is too complex and it renders warnings and errors.
 
 $R^2$ Marginal: Only fixed effects.
+
+```{r}
+############################ FINAL MODELS ######################################
+# ANOVA
+summary(aov(zv ~ valence * intervention, data = df_valence))
+
+# Base model
+base_model <- lmer(zv ~ valence * intervention  + (1|id), data=df_valence, REML=T)
+
+# Suggested by other papers
+suggested_model <- lmer(zv ~ valence * intervention + (1|id) + (1|image), data=df_valence, REML=T)
+
+# The last model without issues
+model_rand_slope <- lmer(zv ~ valence * intervention  + (1 + valence|id) + (1|intervention:image), data = df_valence, REML = T)
+
+
+anova(suggested_model, model4)
+```
 
 # Bayesian analyses
 
