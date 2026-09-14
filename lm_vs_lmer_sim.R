@@ -7,26 +7,50 @@
 # (1 - Type II error) when effect_size != 0.
 ########################################################
 
+# Required libraries---------------
 library(lme4)     # for MLM
 library(lmerTest) # for p-values
+
+# Simulation design -------------
+n_images <- c(25, 40, 55, 70) # Number of images per experimental condition
+n_subj <- c(30, 50, 70)
+effect_size <- c(0, 0.2, 0.5, 0.8)
+# Variances but this needs further discussion
+tau2 <- 0.5
+sigma2 <- 1
+alpha <- c(0.05, 0.01)
+
+# Data generation -------------------
 
 set.seed(123)
 
 n_per_image <- 10     # observations per image
 tau2   <- 0.5         # intercept variance
 sigma2 <- 1           # residual variance
-nsim   <- 1000        # MC replications
+nsim   <- 100        # MC replications. #TODO: Set to 1000
 alpha  <- 0.05        # alpha level for p-values
+tau2_subj <- 0.7     # intercept variance per subject 
 
 sample_size <- 10     # images per condition
 effect_size <- 0      # true interaction effect
 
+# valence: negative, neutral
+# intervention: no, yes
+# group: high, low anxiety
+
+
 # simulate one dataset
-simulate_data <- function(sample_size, effect_size) {
+simulate_data <- function(n_subj, n_images, effect_size) {
+  
   cond <- expand.grid(valence = c(0, 1), intervention = c(0, 1))
-  img  <- cond[rep(1:4, each = sample_size), ]
+  
+  img  <- cond[rep(1:4, each = n_images), ]
   img$image <- 1:nrow(img)
-  img$int_interv_val <- interaction(img$valence, img$intervention, drop = TRUE)
+  
+  subj_id <- rep(1:n_subj, each = nrow(img))
+  
+  # Random effects
+  b_subj <- rnorm(n_subj, mean = 0, sd = tau2_subj)
   img$b_image <- rnorm(nrow(img), 0, sqrt(tau2))   # random intercept per image N(0,tau2)
   
   dat <- img[rep(1:nrow(img), each = n_per_image), ]
@@ -71,7 +95,7 @@ get_estimates <- function(dat) {
 
 # run simulation
 sim_out <- do.call(rbind, lapply(1:nsim, function(i) {
-  get_estimates(simulate_data(sample_size, effect_size))
+  get_estimates(simulate_data(n_images, effect_size))
 }))
 sim_out$reject <- sim_out$p_value < alpha
 
