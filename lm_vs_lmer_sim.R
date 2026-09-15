@@ -1,26 +1,25 @@
 ########################################################
-# Simulation: naive lm vs. fixed-effects lm            
-# vs. true multilevel model (lmer), for the            
+# Simulation: naive lm vs. true multilevel model (lmer), for the            
 # valence x intervention interaction effect.           
 
 # Outcomes: bias and Type I error rate when effect_size = 0, and power
-# (1 - Type II error) when effect_size != 0.
+# (1 - Type II error) when effect_size != 0, and standard errors
 ########################################################
 
-# Required libraries---------------
+# libraries
 library(lme4)     # for MLM
 library(lmerTest) # for p-values
 
-# Simulation design -------------
+# Simulation design
 n_images <- c(25, 40, 55, 70) # Number of images per experimental condition
-n_subj <- c(30, 50, 70)
-effect_sizes <- c(0, 0.2, 0.5, 0.8)
+n_subj <- c(30, 50, 70) # G*power suggestions?
+effect_sizes <- c(0, 0.2, 0.5, 0.8) # remove 0.8?
 # Variances but this needs further discussion
 tau2 <- 0.5
 sigma2 <- 1
 alpha <- c(0.05, 0.01)
 
-# Data generation -------------------
+# Data generation
 
 set.seed(123)
 
@@ -37,7 +36,6 @@ effect_size <- 0      # true interaction effect
 # valence: negative, neutral
 # intervention: no, yes
 # group: high, low anxiety
-
 
 # simulate one dataset
 simulate_data <- function(n_subj, n_images, effect_size) {
@@ -65,13 +63,16 @@ simulate_data <- function(n_subj, n_images, effect_size) {
 
 # pull estimates and p-values
 # when a term is aliased due to exact collinearity, drop that row from the table 
-# for now, this happens in every iteration...
+# new version with SEs
 safe_row <- function(coef_table, term) {
+    cols <- c("Estimate", "Std. Error", "Pr(>|t|)")
     if (term %in% rownames(coef_table)) {
-        coef_table[term, c("Estimate", "Pr(>|t|)")]
+        out <- as.numeric(coef_table[term, cols])
     } else {
-        c(Estimate = NA_real_, `Pr(>|t|)` = NA_real_)
+        out <- rep(NA_real_, length(cols))
     }
+    names(out) <- c("estimate", "se", "p_value")
+    out
 }
 
 # fit all three models on one dataset, extract interaction term
@@ -86,26 +87,56 @@ get_estimates <- function(dat) {
     
     data.frame(
         model    = c("naive", "multilevel"),
-        estimate = c(r_naive["Estimate"], r_mlm["Estimate"]),
-        p_value  = c(r_naive["Pr(>|t|)"], r_mlm["Pr(>|t|)"])
+        estimate = c(r_naive["estimate"], r_mlm["estimate"]),
+        se       = c(r_naive["se"],       r_mlm["se"]),
+        p_value  = c(r_naive["p_value"],  r_mlm["p_value"]),
+        row.names = NULL
     )
 }
 
 # run simulation
-sim_out <- do.call(rbind, lapply(1:nsim, function(i) {
-    get_estimates(simulate_data(n_subj, n_images, effect_sizes))
-}))
-sim_out$reject <- sim_out$p_value < alpha
+# new version with progress bar
+run_simulation <- function(nsim, n_subj, n_images, effect_size, alpha = 0.05,
+                           progress = TRUE) {
+    
+    res <- vector("list", nsim)
+    if (progress) pb <- txtProgressBar(min = 0, max = nsim, style = 3)
+    
+    for (i in seq_len(nsim)) {
+        dat <- simulate_data(n_subj, n_images, effect_size)
+        res[[i]] <- cbind(sim = i, get_estimates(dat))
+        if (progress) setTxtProgressBar(pb, i)
+    }
+    
+    if (progress) close(pb)
+    
+    out <- do.call(rbind, res)
+    out$reject <- out$p_value < alpha
+    out
+}
 
-# summarise: bias and rejection rate (Type I error, or power) per model
-summary_tbl <- do.call(rbind, lapply(split(sim_out, sim_out$model), function(d) {
-    data.frame(model = d$model[1],
-               bias = mean(d$estimate, na.rm = TRUE) - effect_size,
-               rejection_rate = mean(d$reject, na.rm = TRUE),
-               n_dropped = sum(is.na(d$estimate)))
-}))
+# summarise: bias, SEs and rejection rate (Type I error, or power) per model
+summarise_sim <- function(sim_out, effect_size) {
+    do.call(rbind, lapply(split(sim_out, sim_out$model), function(d) {
+        data.frame(model = d$model[1],
+                   bias = mean(d$estimate, na.rm = TRUE) - effect_size,
+                   mean_se = mean(d$se, na.rm = TRUE),
+                   emp_sd = sd(d$estimate, na.rm = TRUE),  # "true" SE for comparison
+                   rejection_rate = mean(d$reject, na.rm = TRUE),
+                   n_dropped = sum(is.na(d$estimate)),
+                   row.names = NULL)
+    }))
+}
 
-print(summary_tbl)
+################################################################################
+# test stuff #
+################################################################################
 
+res <- run_simulation(nsim=100, n_subj=100, n_images=25, effect_size=0, alpha = 0.05,
+                           progress = TRUE)
+summarise_sim(sim_out = res, effect_size = 0)
 
-
+###
+res2 <- run_simulation(nsim=nsim, n_subj=n_subj, n_images=n_images, effect_size=effect_size, alpha = 0.05,
+                      progress = TRUE)
+summarise_sim(sim_out = res2, effect_size = effect_size)
