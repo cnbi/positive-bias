@@ -17,7 +17,7 @@ effect_sizes <- c(0, 0.2, 0.5, 0.8) # remove 0.8?
 # Variances but this needs further discussion
 tau2 <- 0.5
 sigma2 <- 1
-alpha <- c(0.05, 0.01)
+alpha <- 0.05
 
 # Data generation
 
@@ -58,6 +58,7 @@ simulate_data <- function(n_subj, n_images, effect_size) {
     dat$valence      <- factor(dat$valence, labels = c("neg", "pos"))
     dat$intervention <- factor(dat$intervention, labels = c("no", "yes"))
     dat$image        <- factor(dat$image)
+    dat$id           <- subj_id 
     dat
 }
 
@@ -78,9 +79,11 @@ safe_row <- function(coef_table, term) {
 # fit all three models on one dataset, extract interaction term
 get_estimates <- function(dat) {
     m_naive <- lm(Y ~ valence * intervention, data = dat)
-    m_mlm   <- lmer(Y ~ valence * intervention + (1 | intervention:valence:image),
-                    data = dat, REML = TRUE)
-    
+    m_mlm   <- lmer(Y ~ valence * intervention+(1+valence|id) + (1|image:intervention),
+                     data = dat, REML = TRUE)
+    # previous model formultaion:
+    # m_mlm   <- lmer(Y ~ valence * intervention + (1 | intervention:valence:image),
+    #                 data = dat, REML = TRUE)
     term <- "valencepos:interventionyes"
     r_naive <- safe_row(summary(m_naive)$coefficients, term)
     r_mlm   <- safe_row(summary(m_mlm)$coefficients, term)
