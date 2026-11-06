@@ -28,7 +28,7 @@ simulate_data <- function(n_subjects, n_images, effect_size, icc_img, icc_subj, 
     img$b_image <- rnorm(n = nrow(img), mean = 0, sd = sqrt(var_img))   # random intercept per image N(0,var_img)
     e <- rnorm(n = n_subjects*nrow(img), mean = 0, sd = sqrt(var_e)) # residual
     
-    
+    # TODO: Finish the part of this code
     dat <- img[rep(1:nrow(img), each = ), ]
     dat <- cbind(subj_id, dat)
     

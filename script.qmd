@@ -13,26 +13,34 @@ library(lme4)
 library(tidyverse)
 library(readxl)
 library(haven)
+
 df_valence <- read_excel("data/nested_Exp1_valence_imme_ratings_diff.xlsx")
+df_valence$zv <- c(scale(df_valence$Valence_post,center = T,scale = T))
 
 # Standardising valence 
 zv <- c(scale(df_valence$Valence_post,center = T,scale = T))
+
 # Extracting within person observations
 id <- df_valence$Subject
+
 # Extracting valence factor
-valence <- df_valence$Pic_Valence
+valence <- factor(df_valence$Pic_Valence)
+contrasts(valence) <- contr.sum(2)
+
 # Extracting intervention factor
-intervention <- df_valence$Intervention
+intervention <- factor(df_valence$Intervention)
+contrasts(intervention) <- contr.sum(2)
+
 # Extracting image
 image <- df_valence$Image
+
 #Making interaction 
 int_vl <- interaction(df_valence$Intervention, df_valence$Pic_Valence)
 
 df <- data.frame(id = factor(id), 
                  image = factor(image),
-                 valence = factor(valence), 
-                 intervention = factor(intervention), 
-                 int_vl,
+                 valence = valence, 
+                 intervention = intervention,
                  zv)
 ```
 
@@ -95,6 +103,7 @@ $R^2$ Marginal: Only fixed effects.
 ############################ FINAL MODELS ######################################
 # ANOVA
 summary(aov(zv ~ valence * intervention, data = df_valence))
+summary(aov(zv ~ valence * intervention, data = df))
 
 # Base model
 base_model <- lmer(zv ~ valence * intervention  + (1|id), data=df_valence, REML=T)
@@ -105,8 +114,15 @@ suggested_model <- lmer(zv ~ valence * intervention + (1|id) + (1|image), data= 
 # The last model without issues
 model_rand_slope <- lmer(zv ~ valence * intervention  + (1 + valence|id) + (1|intervention:image), data = df_valence, REML = T)
 
+model_rand_slope <- lmer(zv ~ valence * intervention  + (1 + valence|id) + (1|intervention:image), data = df, REML = T)
+summary(model_rand_slope)
 
 anova(suggested_model, model4)
+```
+
+```{r}
+extra_model <- lmer(zv ~ valence * intervention  + (1 + valence + intervention|id) + (1|image), data = df_valence, REML = T)
+summary(extra_model)
 ```
 
 # Bayesian analyses
