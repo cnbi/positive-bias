@@ -80,10 +80,10 @@ model_rand_slope <- lmer(zv ~ valence * intervention  + (1 + valence|id) + (1|in
 model3 <- lmer(zv ~ valence * intervention  + (1|id/valence:intervention), data=df_valence, REML = T)
 
 # It works!
-model4 <- lmer(zv ~ valence * intervention + (1|int_vl:image), data=df_valence, REML = T)
+model4 <- lmer(zv ~ valence * intervention + (1|valence:intervention:image), data=df_valence, REML = T)
 
 # Still works; including id
-model5 <- lmer(zv ~ valence * intervention + (1|id) + (1|int_vl:image), data=df_valence, REML = T) # Same as model3
+model5 <- lmer(zv ~ valence * intervention + (1|id) + (1|valence:intervention:image), data=df_valence, REML = T) # Same as model3
 
 ```
 
@@ -100,7 +100,7 @@ summary(aov(zv ~ valence * intervention, data = df_valence))
 base_model <- lmer(zv ~ valence * intervention  + (1|id), data=df_valence, REML=T)
 
 # Suggested by other papers
-suggested_model <- lmer(zv ~ valence * intervention + (1|id) + (1|image), data=df_valence, REML=T)
+suggested_model <- lmer(zv ~ valence * intervention + (1|id) + (1|image), data= df_valence, REML = T)
 
 # The last model without issues
 model_rand_slope <- lmer(zv ~ valence * intervention  + (1 + valence|id) + (1|intervention:image), data = df_valence, REML = T)

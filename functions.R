@@ -1,22 +1,41 @@
 ########################### FUNCTIONS #####################################
 
-# simulate one dataset
-simulate_data <- function(n_subj, n_images, effect_size, seed) {
-    set.seed(seed)
-    cond <- expand.grid(valence = c(0, 1), intervention = c(0, 1))
+# Simulate one dataset
+simulate_data <- function(n_subjects, n_images, effect_size, icc_img, icc_subj, prop_slope_var, seed) {
     
-    img  <- cond[rep(1:4, each = n_images), ]
+    # Experimental conditions (Interverntion: labeling, matching. Valence: netural, negative)
+    cond <- expand.grid(valence = c(-1, 1), intervention = c(-1, 1))
+    # 1 and -1 because 1 and 0 implies that the ICC is describing the negative labeling
+    
+    # Stimuli
+    img <- cond[rep(1:4, each = n_images), ]
     img$image <- 1:nrow(img)
+    img$set <- rep(1:4, each = n_images)
     
-    subj_id <- rep(1:n_subj, each = nrow(img))
+    # Participants id
+    subj_id <- rep(1:n_subjects, each = nrow(img))
     
-    # Random effects
-    b_subj <- rnorm(n_subj, mean = 0, sd = tau2_subj)
-    img$b_image <- rnorm(nrow(img), 0, sqrt(tau2))   # random intercept per image N(0,tau2)
+    # Variances
+    total_var <- 1
+    var_subj <- total_var * icc_subj
+    var_img <- total_var * icc_img
+    slope_var <- total_var * prop_slope_var
+    var_e <- 1 - var_subj - var_img - slope_var
     
-    dat <- img[rep(1:nrow(img), each = n_per_image), ]
-    dat$Y <- effect_size * dat$valence * dat$intervention +
-        dat$b_image + rnorm(nrow(dat), 0, sqrt(sigma2))
+    # Random
+    set.seed(seed)
+    img$b_subj <- rnorm(n = n_subjects, mean = 0, sd = sqrt(var_subj))   # random intercept per subject N(0,var_subj)
+    img$b_image <- rnorm(n = nrow(img), mean = 0, sd = sqrt(var_img))   # random intercept per image N(0,var_img)
+    e <- rnorm(n = n_subjects*nrow(img), mean = 0, sd = sqrt(var_e)) # residual
+    
+    
+    dat <- img[rep(1:nrow(img), each = ), ]
+    dat <- cbind(subj_id, dat)
+    
+    # TODO: I am not sure what should be the model to generate the data.Should be model 4?
+    # Effect size would be the effect of the interaction?
+    dat$Y <- -0.005 + (-0.686 * dat$valence) + (0.054 * dat$intervention) + effect_size * dat$valence * dat$intervention +
+        dat$b_image + dat$b_subj + 
     
     dat$valence      <- factor(dat$valence, labels = c("neg", "pos"))
     dat$intervention <- factor(dat$intervention, labels = c("no", "yes"))
